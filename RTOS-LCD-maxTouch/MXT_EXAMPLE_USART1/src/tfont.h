@@ -9,12 +9,12 @@
 #ifndef TFONT_H_
 #define TFONT_H_
 
-typedef struct {
-	const uint8_t *data;
-	int width;
-	int height;
-	int other;
-} tImage;
+//typedef struct {
+	//const uint8_t *data;
+	//int width;
+	//int height;
+//	int other;
+//} tImage;
 
  typedef struct {
 	 long int code;
