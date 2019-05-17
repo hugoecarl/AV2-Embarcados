@@ -131,7 +131,7 @@
 
 /** PWM channel instance for LEDs */
 pwm_channel_t g_pwm_channel_led;
-uint duty = 0;
+
 
 
 /** Reference voltage for AFEC,in mv. */
@@ -173,7 +173,7 @@ uint32_t hour, minuto,seg;
 #define TASK_SLE_STACK_SIZE            (2*1024/sizeof(portSTACK_TYPE))
 #define TASK_SLE_STACK_PRIORITY        (tskIDLE_PRIORITY)
 
-
+int duty = 0;
 
 typedef struct {
   uint x;
@@ -181,11 +181,13 @@ typedef struct {
 } touchData;
 
 QueueHandle_t xQueueTouch;
+QueueHandle_t xQueueBot1;
+QueueHandle_t xQueueBot2;
 /** Semaforo a ser usado pela task led */
-SemaphoreHandle_t xSemaphorepwmdown;
+//SemaphoreHandle_t xSemaphorepwmdown;
 SemaphoreHandle_t xSemaphore;
 SemaphoreHandle_t xSemaphoresleep;
-SemaphoreHandle_t xSemaphorepwmup;
+//SemaphoreHandle_t xSemaphorepwmup;
 
 
 
@@ -248,13 +250,15 @@ static void AFEC_pot_callback(void)
 
 static void but_p_freq_callback(void){
 	printf("AEE\n");
-	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-	xSemaphoreGiveFromISR(xSemaphorepwmdown, &xHigherPriorityTaskWoken);
+	//BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+	//xSemaphoreGiveFromISR(xSemaphorepwmdown, &xHigherPriorityTaskWoken);
+	xQueueSendFromISR( xQueueBot1, &duty, 0); 
 }
 static void but_m_freq_callback(void){
 	printf("AOO\n");
-	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-	xSemaphoreGiveFromISR(xSemaphorepwmup, &xHigherPriorityTaskWoken);
+	//BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+	//xSemaphoreGiveFromISR(xSemaphorepwmup, &xHigherPriorityTaskWoken);
+	xQueueSendFromISR( xQueueBot2, &duty, 0); 
 }
 
 
@@ -590,10 +594,14 @@ void task_semaf(void){
 
 
 void task_lcd(void){	
+	
+	
 	xQueueTouch = xQueueCreate( 10, sizeof( touchData ) );
+	xQueueBot1 = xQueueCreate( 10, sizeof( int32_t ) );
+	xQueueBot2 = xQueueCreate( 10, sizeof( int32_t ) );
 	xSemaphore = xSemaphoreCreateBinary();
-	xSemaphorepwmup = xSemaphoreCreateBinary();
-	xSemaphorepwmdown = xSemaphoreCreateBinary();
+	//xSemaphorepwmup = xSemaphoreCreateBinary();
+	//xSemaphorepwmdown = xSemaphoreCreateBinary();
 	
 	
 	configure_lcd();
@@ -634,14 +642,15 @@ void task_lcd(void){
 		 itoa(temp, hnum, 10);
 		 font_draw_text(&digital52, hnum, 130, 400, 1);	 
 	 }
-	 
-	 	if ( xSemaphoreTake(xSemaphorepwmup, ( TickType_t ) 500) == pdTRUE){
+	  if (xQueueReceive( xQueueBot1, &(duty), ( TickType_t )  500 / portTICK_PERIOD_MS)) {
+	 	//if ( xSemaphoreTake(xSemaphorepwmup, ( TickType_t ) 500) == pdTRUE){
 		 	
 			ili9488_set_foreground_color(COLOR_CONVERT(COLOR_WHITE));
 		 	ili9488_draw_filled_rectangle(120,370,300,295);
 		 	if (duty < 100){
 				duty+=10;
-			 }
+			// }
+		 }
 		 	
 			pwm_channel_update_duty(PWM0, &g_pwm_channel_led, 100-duty);
 		 	itoa(duty, dutystr, 10);
@@ -649,13 +658,14 @@ void task_lcd(void){
 			 font_draw_text(&digital52, "%", 230, 310, 1);
 
 	 	}
-	 	if ( xSemaphoreTake(xSemaphorepwmdown, ( TickType_t ) 500) == pdTRUE){
-		 	
+	 	//if ( xSemaphoreTake(xSemaphorepwmdown, ( TickType_t ) 500) == pdTRUE){
+		  if (xQueueReceive( xQueueBot2, &(duty), ( TickType_t )  500 / portTICK_PERIOD_MS)) {	
 			 ili9488_set_foreground_color(COLOR_CONVERT(COLOR_WHITE));
 		 	ili9488_draw_filled_rectangle(120,370,300,295);
 		 	if (duty > 0){
 			 	duty-=10;
-		 	}
+		 	//}
+		  }
 		 	
 			 pwm_channel_update_duty(PWM0, &g_pwm_channel_led, 100-duty);
 		 	itoa(duty, dutystr, 10);
